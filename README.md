@@ -11,7 +11,6 @@
 - 在微信中给 Claude Code 发消息，Claude 直接在终端中处理并回复到微信
 - 支持文本、图片、语音、视频、文件等全媒体类型
 - 微信扫码登录，零配置即用
-- 收到消息时自动显示"对方正在输入..."状态
 - Claude 回复自动转为纯文本（微信不支持 Markdown）
 
 ## 前置要求
@@ -24,10 +23,10 @@
 
 ```bash
 # 1. 添加插件源
-/plugin marketplace add Dcatfly/weixin_claude_code
+/plugin marketplace add Dcatfly/claude-plugins
 
 # 2. 安装插件
-/plugin install weixin-claude-code@Dcatfly-weixin_claude_code
+/plugin install weixin-claude-code@dcatfly-plugins
 ```
 
 ## 使用
@@ -35,7 +34,7 @@
 ### 启动
 
 ```bash
-claude --dangerously-load-development-channels plugin:weixin-claude-code@weixin-claude-code
+claude --dangerously-load-development-channels plugin:weixin-claude-code@dcatfly-plugins
 ```
 
 > 自定义 Channel 目前处于研究预览阶段，需要使用 `--dangerously-load-development-channels` 标志启动。
@@ -87,7 +86,6 @@ claude --dangerously-load-development-channels plugin:weixin-claude-code@weixin-
 - **Session 过期需手动重新登录** —— 微信 session 过期后需要重新调用 `login` 扫码
 - **Channel 功能处于研究预览阶段** —— 需要 `--dangerously-load-development-channels` 标志
 - **需要 claude.ai 登录** —— 不支持 Console 或 API Key 认证
-- **二维码显示可能被折叠** —— 在 Claude Code 中按 `ctrl+o` 展开查看
 
 ## 数据存储
 

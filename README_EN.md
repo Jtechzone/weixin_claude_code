@@ -11,7 +11,6 @@ Ported from the communication layer of [`@tencent-weixin/openclaw-weixin`](https
 - Send messages to Claude Code from WeChat, get replies back in WeChat
 - Full media support: text, images, voice, video, files
 - QR code login, zero configuration
-- Auto "typing..." indicator when processing messages
 - Replies automatically converted to plain text (WeChat doesn't render Markdown)
 
 ## Prerequisites
@@ -24,10 +23,10 @@ Ported from the communication layer of [`@tencent-weixin/openclaw-weixin`](https
 
 ```bash
 # 1. Add plugin marketplace
-/plugin marketplace add Dcatfly/weixin_claude_code
+/plugin marketplace add Dcatfly/claude-plugins
 
 # 2. Install plugin
-/plugin install weixin-claude-code@Dcatfly-weixin_claude_code
+/plugin install weixin-claude-code@dcatfly-plugins
 ```
 
 ## Usage
@@ -35,7 +34,7 @@ Ported from the communication layer of [`@tencent-weixin/openclaw-weixin`](https
 ### Start
 
 ```bash
-claude --dangerously-load-development-channels plugin:weixin-claude-code@weixin-claude-code
+claude --dangerously-load-development-channels plugin:weixin-claude-code@dcatfly-plugins
 ```
 
 > Custom Channels are in research preview and require the `--dangerously-load-development-channels` flag.
@@ -87,7 +86,6 @@ The plugin runs as an MCP Channel server, receiving WeChat messages via iLink Bo
 - **Manual re-login on session expiry** — when the WeChat session expires, you need to call `login` again
 - **Channel feature is in research preview** — requires `--dangerously-load-development-channels` flag
 - **Requires claude.ai login** — Console or API Key authentication not supported
-- **QR code may be folded** — press `ctrl+o` in Claude Code to expand
 
 ## Data Storage
 
