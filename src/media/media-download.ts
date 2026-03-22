@@ -44,7 +44,7 @@ export async function downloadMediaFromItem(
     label: string;
   },
 ): Promise<InboundMediaResult> {
-  const { cdnBaseUrl, log, errLog, label } = deps;
+  const { cdnBaseUrl, errLog, label } = deps;
   const result: InboundMediaResult = {};
 
   if (item.type === MessageItemType.IMAGE) {
