@@ -70,7 +70,7 @@ weixin_claw/
   - `api/session-guard.ts` — 保留 errcode -14 检测逻辑；设计变更：vendor 原实现为暂停 1 小时后自动重试，此处改为暂停 poll 并通知用户手动 `login` 重新扫码，因为 MCP Channel 场景下 token 过期通常需要重新认证
   - `auth/accounts.ts` — 自行实现 `normalizeAccountId`（将 `@` 和 `.` 替换为 `-`，已通过 vendor 代码 `deriveRawAccountId` 反向确认），存储路径改为 `~/.claude/channels/wechat/`，去除 `deriveRawAccountId` 和 `loadLegacyToken` 等向后兼容逻辑
   - `auth/login-qr.ts` — 移除 `loadConfigRouteTag` 依赖；`qrcode-terminal` 输出重定向到 stderr（stdout 是 MCP 协议通道），或作为备用方案仅依赖 `qrcodeUrl` 返回值让 Claude 展示
-  - `media/media-download.ts` — 将 `saveMediaBuffer` 回调替换为本地文件写入（`os.tmpdir()/weixin-claw/media/inbound/`）
+  - `media/media-download.ts` — 将 `saveMediaBuffer` 回调替换为本地文件写入（`os.tmpdir()/weixin-claude-code/media/inbound/`）
   - `messaging/inbound.ts` — 简化，去掉 `MsgContext` 类型，保留消息解析和 `context_token` 缓存
   - `messaging/send.ts` — 自行实现完整的 `markdownToPlainText`：vendor 版本先处理代码围栏/图片/链接/表格，最后调用 SDK 的 `stripMarkdown(result)` 做最终清理（去除 `**`、`*`、`~~`、`#` 等 Markdown 格式标记），新实现需将此逻辑内联，不依赖 SDK；移除 `ReplyPayload` 类型依赖
   - `storage/sync-buf.ts` — 从 vendor 的 `storage/sync-buf.ts` 适配，去除 legacy 兼容路径回退，存储路径改为 `~/.claude/channels/wechat/sync/`
@@ -83,7 +83,7 @@ weixin_claw/
 
 1. `poll-loop` 调用 `ilink/bot/getupdates`（HTTP long-poll，35 秒超时）
 2. 过滤消息：仅接受 `msg.from_user_id === savedUserId`（登录用户自己的微信 ID，扫码时由 iLink API 返回的 `ilink_user_id`）
-3. 如果消息包含媒体（图片/语音/视频/文件），从微信 CDN 下载到本地临时目录（`os.tmpdir()/weixin-claw/media/inbound/`）并解密
+3. 如果消息包含媒体（图片/语音/视频/文件），从微信 CDN 下载到本地临时目录（`os.tmpdir()/weixin-claude-code/media/inbound/`）并解密
 4. 自动发送 typing 状态（通过 `ilink/bot/sendtyping`，需要 `typing_ticket`）
 5. 发送 MCP notification：
    ```
@@ -108,6 +108,8 @@ weixin_claw/
 6. 带媒体：AES-128-ECB 加密文件 → 从 `ilink/bot/getuploadurl` 获取预签名上传地址 → 上传到微信 CDN → 发送引用 CDN 资源的消息
 
 ## MCP 工具
+
+**消息接收方式**：入站消息不通过工具读取，而是通过 MCP Channel notification 主动推送到 Claude Code 会话中。poll-loop 收到微信消息后调用 `mcp.notification({ method: 'notifications/claude/channel', ... })`，Claude Code 会将其作为 `<channel>` 标签注入到当前对话上下文，Claude 直接看到消息内容并决定如何处理。因此工具列表只需要出站操作（reply）和管理操作（login、status），无需 "read" 工具。
 
 ### `reply` — 回复微信消息
 
@@ -212,7 +214,7 @@ weixin_claw/
 
 ## 临时文件管理
 
-入站媒体下载到 `os.tmpdir()/weixin-claw/media/inbound/`，出站媒体临时文件存放在 `os.tmpdir()/weixin-claw/media/outbound/`。进程启动时清理超过 24 小时的临时文件。
+入站媒体下载到 `os.tmpdir()/weixin-claude-code/media/inbound/`，出站媒体临时文件存放在 `os.tmpdir()/weixin-claude-code/media/outbound/`。进程启动时清理超过 24 小时的临时文件。
 
 ## 依赖
 
