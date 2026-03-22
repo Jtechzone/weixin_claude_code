@@ -364,58 +364,38 @@ git commit -m "feat: add storage layer (accounts, sync-buf)"
 
 ---
 
-### Task 5: CDN 层
+### Task 5: 媒体基础 + CDN 层
 
-直接复制所有 CDN 文件，确保 import 路径正确。
+先创建 `media/mime.ts`（CDN 的 `upload.ts` 依赖它），然后复制所有 CDN 文件，最后创建剩余媒体文件。
 
 **Files:**
+- Create: `src/media/mime.ts`
 - Create: `src/cdn/aes-ecb.ts`
 - Create: `src/cdn/cdn-url.ts`
 - Create: `src/cdn/pic-decrypt.ts`
 - Create: `src/cdn/cdn-upload.ts`
 - Create: `src/cdn/upload.ts`
+- Create: `src/media/silk-transcode.ts`
+- Create: `src/media/media-download.ts`
 
-- [ ] **Step 1: 复制 CDN 文件**
+- [ ] **Step 1: 复制 src/media/mime.ts**
+
+从 `vendor/package/src/media/mime.ts` 直接复制，无需修改。CDN 层的 `upload.ts` 依赖此文件。
+
+- [ ] **Step 2: 复制 CDN 文件**
 
 从 `vendor/package/src/cdn/` 复制以下文件到 `src/cdn/`：
 - `aes-ecb.ts` — 直接复制，无需修改
 - `cdn-url.ts` — 直接复制，无需修改
 - `pic-decrypt.ts` — 确认 import 路径指向 `./aes-ecb.js`、`./cdn-url.js`、`../util/logger.js`
 - `cdn-upload.ts` — 确认 import 路径指向 `./aes-ecb.js`、`./cdn-url.js`、`../util/logger.js`、`../util/redact.js`
-- `upload.ts` — 确认 import 路径正确；此文件 import `../api/api.js`（`getUploadUrl`）、`../api/types.js`（`UploadMediaType`）、`../media/mime.js`（`getExtensionFromContentTypeOrUrl`）、`../util/random.js`（`tempFileName`）
+- `upload.ts` — 确认 import 路径正确；此文件 import `../api/api.js`、`../api/types.js`、`../media/mime.js`、`../util/random.js`
 
-- [ ] **Step 2: 类型检查**
-
-Run: `npx tsc --noEmit`
-Expected: 可能因 `../media/mime.js` 尚未创建而报错，此时先跳过，在 Task 6 中解决
-
-- [ ] **Step 3: 提交**
-
-```bash
-git add src/cdn/
-git commit -m "feat: add CDN layer (aes-ecb, cdn-url, pic-decrypt, cdn-upload, upload)"
-```
-
----
-
-### Task 6: 媒体层
-
-复制 `media/mime.ts`、`media/silk-transcode.ts`，适配 `media/media-download.ts`。
-
-**Files:**
-- Create: `src/media/mime.ts`
-- Create: `src/media/silk-transcode.ts`
-- Create: `src/media/media-download.ts`
-
-- [ ] **Step 1: 复制 src/media/mime.ts**
-
-从 `vendor/package/src/media/mime.ts` 直接复制，无需修改。
-
-- [ ] **Step 2: 复制 src/media/silk-transcode.ts**
+- [ ] **Step 3: 复制 src/media/silk-transcode.ts**
 
 从 `vendor/package/src/media/silk-transcode.ts` 复制，确认 logger import 路径正确。
 
-- [ ] **Step 3: 适配 src/media/media-download.ts**
+- [ ] **Step 4: 适配 src/media/media-download.ts**
 
 从 `vendor/package/src/media/media-download.ts` 复制，做以下修改：
 - 移除 `SaveMediaFn` 类型定义（原来依赖 framework 的 `saveMediaBuffer`）
@@ -467,7 +447,18 @@ async function saveTempMedia(
   return { path: filePath };
 }
 
-// downloadMediaFromItem 函数的签名改为：
+// downloadMediaFromItem：从 vendor 复制完整逻辑
+// 关键变更：参数类型从推断类型改为 MessageItem，移除 saveMedia 依赖
+// vendor 中 `await saveMedia(buf, contentType, "inbound", MAX_BYTES, filename)` 替换为：
+//   `await saveTempMedia(buf, contentType, filename)`
+// 完整函数体从 vendor/package/src/media/media-download.ts 第 27-141 行复制，
+// 逐个 saveMedia 调用替换如下：
+//
+//   IMAGE:  saveMedia(buf, undefined, "inbound", MAX)         → saveTempMedia(buf, undefined)
+//   VOICE(wav):  saveMedia(wavBuf, "audio/wav", "inbound", MAX) → saveTempMedia(wavBuf, "audio/wav")
+//   VOICE(silk): saveMedia(silkBuf, "audio/silk", "inbound", MAX) → saveTempMedia(silkBuf, "audio/silk")
+//   FILE:   saveMedia(buf, mime, "inbound", MAX, fileName)    → saveTempMedia(buf, mime, fileName)
+//   VIDEO:  saveMedia(buf, "video/mp4", "inbound", MAX)       → saveTempMedia(buf, "video/mp4")
 export async function downloadMediaFromItem(
   item: MessageItem,
   deps: {
@@ -477,26 +468,85 @@ export async function downloadMediaFromItem(
     label: string;
   },
 ): Promise<InboundMediaResult> {
-  // 逻辑与 vendor 版本相同，只是把所有 `saveMedia(...)` 调用替换为 `saveTempMedia(...)`
-  // 完整实现见 vendor/package/src/media/media-download.ts，逐行复制并替换 saveMedia
+  const { cdnBaseUrl, log, errLog, label } = deps;
+  const result: InboundMediaResult = {};
+
+  if (item.type === MessageItemType.IMAGE) {
+    const img = item.image_item;
+    if (!img?.media?.encrypt_query_param) return result;
+    const aesKeyBase64 = img.aeskey
+      ? Buffer.from(img.aeskey, "hex").toString("base64")
+      : img.media.aes_key;
+    try {
+      const buf = aesKeyBase64
+        ? await downloadAndDecryptBuffer(img.media.encrypt_query_param, aesKeyBase64, cdnBaseUrl, `${label} image`)
+        : await downloadPlainCdnBuffer(img.media.encrypt_query_param, cdnBaseUrl, `${label} image-plain`);
+      const saved = await saveTempMedia(buf, undefined);
+      result.decryptedPicPath = saved.path;
+    } catch (err) {
+      errLog(`${label} image download failed: ${String(err)}`);
+    }
+  } else if (item.type === MessageItemType.VOICE) {
+    const voice = item.voice_item;
+    if (!voice?.media?.encrypt_query_param || !voice.media.aes_key) return result;
+    try {
+      const silkBuf = await downloadAndDecryptBuffer(voice.media.encrypt_query_param, voice.media.aes_key, cdnBaseUrl, `${label} voice`);
+      const wavBuf = await silkToWav(silkBuf);
+      if (wavBuf) {
+        const saved = await saveTempMedia(wavBuf, "audio/wav");
+        result.decryptedVoicePath = saved.path;
+        result.voiceMediaType = "audio/wav";
+      } else {
+        const saved = await saveTempMedia(silkBuf, "audio/silk");
+        result.decryptedVoicePath = saved.path;
+        result.voiceMediaType = "audio/silk";
+      }
+    } catch (err) {
+      errLog(`${label} voice download failed: ${String(err)}`);
+    }
+  } else if (item.type === MessageItemType.FILE) {
+    const fileItem = item.file_item;
+    if (!fileItem?.media?.encrypt_query_param || !fileItem.media.aes_key) return result;
+    try {
+      const buf = await downloadAndDecryptBuffer(fileItem.media.encrypt_query_param, fileItem.media.aes_key, cdnBaseUrl, `${label} file`);
+      const mime = getMimeFromFilename(fileItem.file_name ?? "file.bin");
+      const saved = await saveTempMedia(buf, mime, fileItem.file_name ?? undefined);
+      result.decryptedFilePath = saved.path;
+      result.fileMediaType = mime;
+    } catch (err) {
+      errLog(`${label} file download failed: ${String(err)}`);
+    }
+  } else if (item.type === MessageItemType.VIDEO) {
+    const videoItem = item.video_item;
+    if (!videoItem?.media?.encrypt_query_param || !videoItem.media.aes_key) return result;
+    try {
+      const buf = await downloadAndDecryptBuffer(videoItem.media.encrypt_query_param, videoItem.media.aes_key, cdnBaseUrl, `${label} video`);
+      const saved = await saveTempMedia(buf, "video/mp4");
+      result.decryptedVideoPath = saved.path;
+    } catch (err) {
+      errLog(`${label} video download failed: ${String(err)}`);
+    }
+  }
+
+  return result;
 }
 ```
 
-- [ ] **Step 4: 类型检查**
+- [ ] **Step 5: 类型检查**
 
 Run: `npx tsc --noEmit`
 Expected: 无错误
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 6: 提交**
 
 ```bash
-git add src/media/
-git commit -m "feat: add media layer (mime, silk-transcode, media-download)"
+git add src/media/ src/cdn/
+git commit -m "feat: add media + CDN layer (mime, silk-transcode, media-download, aes-ecb, cdn-url, pic-decrypt, cdn-upload, upload)"
 ```
 
 ---
 
-### Task 7: 消息层（inbound + send + send-media）
+### Task 6: 消息层（原 Task 7）（inbound + send + send-media）
 
 适配 `messaging/inbound.ts`（简化，去掉 MsgContext），适配 `messaging/send.ts`（内联 stripMarkdown），复制 `messaging/send-media.ts`。
 
@@ -581,7 +631,9 @@ export function markdownToPlainText(text: string): string {
 }
 ```
 
-- `buildSendMessageReq` 中移除 `ReplyPayload` 类型，改为直接使用 `{ text: string }` 参数
+- 删除 `buildSendMessageReq` 函数（它只是对 `buildTextMessageReq` 的透传包装，且依赖 `ReplyPayload` 类型）
+- `sendMessageWeixin` 中将 `buildSendMessageReq(...)` 调用改为直接调用 `buildTextMessageReq({ to, text, contextToken: opts.contextToken, clientId })`
+- 移除 `import type { ReplyPayload } from "openclaw/plugin-sdk"` 和 `import { stripMarkdown } from "openclaw/plugin-sdk"`
 - 其余函数保持不变：`sendMessageWeixin`、`sendImageMessageWeixin`、`sendVideoMessageWeixin`、`sendFileMessageWeixin`
 
 - [ ] **Step 3: 复制 src/messaging/send-media.ts**
@@ -602,7 +654,7 @@ git commit -m "feat: add messaging layer (inbound, send, send-media)"
 
 ---
 
-### Task 8: 扫码登录
+### Task 7: 扫码登录
 
 适配 `auth/login-qr.ts`（移除 SDK 依赖，stderr 输出）。
 
@@ -612,9 +664,13 @@ git commit -m "feat: add messaging layer (inbound, send, send-media)"
 - [ ] **Step 1: 适配 src/auth/login-qr.ts**
 
 从 `vendor/package/src/auth/login-qr.ts` 复制，做以下修改：
-- 移除 `import { loadConfigRouteTag } from "./accounts.js"` — `fetchQRCode` 和 `pollQRStatus` 中的 `SKRouteTag` header 直接删除
-- `qrcode-terminal` 的 `generate()` 输出默认到 stdout，需要改为 stderr：在 `waitForWeixinLogin` 中将 `process.stdout.write(...)` 全部改为 `process.stderr.write(...)`
-- 保留所有导出类型和函数签名：`WeixinQrStartResult`、`WeixinQrWaitResult`、`startWeixinLoginWithQr`、`waitForWeixinLogin`、`DEFAULT_ILINK_BOT_TYPE`
+- 移除 `import { loadConfigRouteTag } from "./accounts.js"` — `fetchQRCode` 和 `pollQRStatus` 中的 `SKRouteTag` header 相关代码直接删除
+- **将文件中所有 `process.stdout.write(...)` 替换为 `process.stderr.write(...)`**（stdout 是 MCP 协议通道，任何非 MCP 输出都会破坏协议）。需要替换的位置包括：
+  - `waitForWeixinLogin` 中的等待点输出 `process.stdout.write(".")`
+  - 已扫码提示 `process.stdout.write("\n... 已扫码...\n")`
+  - 二维码过期提示 `process.stdout.write("... 二维码已过期...\n")`
+  - 新二维码生成提示 `process.stdout.write("... 新二维码已生成...\n")`
+  - QR Code URL 输出 `process.stdout.write("QR Code URL: ...\n")`
 - `qrcode-terminal` 默认输出到 stdout，`generate` 回调中手动写 stderr：
 
 ```typescript
@@ -624,6 +680,9 @@ qrterm.default.generate(qrResponse.qrcode_img_content, { small: true }, (qr: str
   process.stderr.write(qr + "\n");
 });
 ```
+
+- 在 `startWeixinLoginWithQr` 中同样处理 `qrcode-terminal` 和 `console.log`，全部重定向到 stderr
+- 保留所有导出类型和函数签名：`WeixinQrStartResult`、`WeixinQrWaitResult`、`startWeixinLoginWithQr`、`waitForWeixinLogin`、`DEFAULT_ILINK_BOT_TYPE`
 
 - [ ] **Step 2: 类型检查**
 
@@ -639,7 +698,7 @@ git commit -m "feat: add QR code login (adapted for MCP stdio)"
 
 ---
 
-### Task 9: MCP Channel 服务器
+### Task 8: MCP Channel 服务器
 
 全新编写 `mcp-server.ts`，创建 MCP Server 并注册 reply/login/status 工具。
 
@@ -667,7 +726,13 @@ import { TypingStatus } from "./api/types.js";
 import { logger } from "./util/logger.js";
 
 // typing 状态管理
-const typingTimers = new Map<string, NodeJS.Timeout>();
+type TypingState = {
+  timer: NodeJS.Timeout;
+  baseUrl: string;
+  token?: string;
+  typingTicket: string;
+};
+const typingStates = new Map<string, TypingState>();
 
 export function startTyping(chatId: string, baseUrl: string, token?: string, typingTicket?: string): void {
   stopTyping(chatId);
@@ -682,14 +747,19 @@ export function startTyping(chatId: string, baseUrl: string, token?: string, typ
 
   doTyping();
   const timer = setInterval(doTyping, 5000);
-  typingTimers.set(chatId, timer);
+  typingStates.set(chatId, { timer, baseUrl, token, typingTicket });
 }
 
 export function stopTyping(chatId: string): void {
-  const timer = typingTimers.get(chatId);
-  if (timer) {
-    clearInterval(timer);
-    typingTimers.delete(chatId);
+  const state = typingStates.get(chatId);
+  if (state) {
+    clearInterval(state.timer);
+    typingStates.delete(chatId);
+    // 向微信发送取消 typing 状态
+    sendTyping({
+      baseUrl: state.baseUrl, token: state.token,
+      body: { ilink_user_id: chatId, typing_ticket: state.typingTicket, status: TypingStatus.CANCEL },
+    }).catch((err) => logger.warn(`typing cancel error: ${String(err)}`));
   }
 }
 
@@ -897,7 +967,7 @@ git commit -m "feat: add MCP Channel server with reply/login/status tools"
 
 ---
 
-### Task 10: Long-poll 循环
+### Task 9: Long-poll 循环
 
 全新编写 `poll-loop.ts`，基于 vendor `monitor.ts` 简化。
 
@@ -1144,7 +1214,7 @@ git commit -m "feat: add poll-loop (getUpdates long-poll with notification push)
 
 ---
 
-### Task 11: 入口与集成
+### Task 10: 入口与集成
 
 全新编写 `index.ts`，串联所有模块。创建 `.mcp.json` 配置。
 
@@ -1314,7 +1384,7 @@ git commit -m "feat: add entry point and MCP config, complete channel implementa
 
 ---
 
-### Task 12: 编译修复与冒烟测试
+### Task 11: 编译修复与冒烟测试
 
 修复所有编译错误，进行基本的冒烟测试。
 
