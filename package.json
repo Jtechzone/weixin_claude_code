@@ -1,5 +1,5 @@
 {
-  "name": "weixin-claude-code-channel",
+  "name": "weixin-claude-code",
   "version": "0.1.0",
   "description": "WeChat Channel for Claude Code via iLink Bot API",
   "type": "module",
