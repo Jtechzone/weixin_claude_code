@@ -189,6 +189,19 @@ async function handleLogin() {
     return { content: [{ type: "text" as const, text: `登录失败: ${startResult.message}` }] };
   }
 
+  // 生成 ASCII 二维码，包含在工具响应中让用户直接看到
+  let qrAscii = "";
+  try {
+    const qrcodeterminal = await import("qrcode-terminal");
+    qrAscii = await new Promise<string>((resolve) => {
+      qrcodeterminal.default.generate(startResult.qrcodeUrl!, { small: true }, (qr: string) => {
+        resolve(qr);
+      });
+    });
+  } catch {
+    // qrcode-terminal 不可用，回退到仅显示 URL
+  }
+
   // 后台轮询扫码状态
   (async () => {
     const waitResult = await waitForWeixinLogin({
@@ -213,10 +226,14 @@ async function handleLogin() {
     }
   })().catch((err) => logger.error(`background login poll failed: ${String(err)}`));
 
+  const responseText = qrAscii
+    ? `请用微信扫描以下二维码登录:\n\n${qrAscii}\n链接: ${startResult.qrcodeUrl}\n\n${startResult.message}`
+    : `请用微信扫描二维码登录:\n${startResult.qrcodeUrl}\n\n${startResult.message}`;
+
   return {
     content: [{
       type: "text" as const,
-      text: `请用微信扫描二维码登录:\n${startResult.qrcodeUrl}\n\n${startResult.message}`,
+      text: responseText,
     }],
   };
 }
