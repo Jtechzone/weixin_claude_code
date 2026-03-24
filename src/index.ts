@@ -21,6 +21,36 @@ async function main() {
   logger.info("MCP server connected via stdio");
 
   const abortController = new AbortController();
+  let shuttingDown = false;
+
+  function shutdown(): void {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info("shutting down...");
+    abortController.abort();
+    process.exit(0);
+  }
+
+  process.stdin.on("end", shutdown);
+  process.stdin.on("close", shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
+  // ---------------------------------------------------------------------------
+  // 已知局限：channel 模式检测
+  //
+  // 当前 MCP 协议不提供任何机制让 server 检测自身是否运行在 channel 模式
+  // （即 Claude Code 是否以 --channels 启动）。非 channel 模式下：
+  //   - poll-loop 仍会运行并消费 getUpdates 中的消息
+  //   - notifications/claude/channel 会被 Claude Code 静默丢弃
+  //   - 这会导致后续以 channel 模式启动的会话丢失已被消费的消息
+  //
+  // 此问题属于 Claude Code 核心架构缺陷，社区已有反馈：
+  //   - https://github.com/anthropics/claude-code/issues/36964
+  //
+  // 在官方提供 channel 模式检测信号之前，此处暂无法区分两种模式，
+  // 只能无条件启动 poll-loop，建议只在需要的会话中启动此 MCP Server。
+  // ---------------------------------------------------------------------------
 
   // 启动 poll-loop 的函数，返回是否成功启动
   function launchPollLoop(accountId: string): boolean {
@@ -81,18 +111,6 @@ async function main() {
       }
     }, 1000);
   }
-
-  // 优雅退出
-  process.on("SIGINT", () => {
-    logger.info("received SIGINT, shutting down...");
-    abortController.abort();
-    process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    logger.info("received SIGTERM, shutting down...");
-    abortController.abort();
-    process.exit(0);
-  });
 }
 
 main().catch((err) => {

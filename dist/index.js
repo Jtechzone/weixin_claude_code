@@ -25479,7 +25479,7 @@ function createMcpServer() {
 ${params.description}
 ` + (params.input_preview ? `\u8F93\u5165: ${params.input_preview}
 ` : "") + `
-\u56DE\u590D yes \u5141\u8BB8 / no \u62D2\u7EDD`;
+\u56DE\u590D yes / no `;
     try {
       await sendMessageWeixin({
         to: account.userId,
@@ -26078,6 +26078,19 @@ async function main() {
   await server.connect(transport);
   logger.info("MCP server connected via stdio");
   const abortController = new AbortController;
+  let shuttingDown = false;
+  function shutdown() {
+    if (shuttingDown)
+      return;
+    shuttingDown = true;
+    logger.info("shutting down...");
+    abortController.abort();
+    process.exit(0);
+  }
+  process.stdin.on("end", shutdown);
+  process.stdin.on("close", shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
   function launchPollLoop(accountId) {
     const account = resolveWeixinAccount(accountId);
     if (!account.configured) {
@@ -26129,16 +26142,6 @@ async function main() {
       }
     }, 1000);
   }
-  process.on("SIGINT", () => {
-    logger.info("received SIGINT, shutting down...");
-    abortController.abort();
-    process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    logger.info("received SIGTERM, shutting down...");
-    abortController.abort();
-    process.exit(0);
-  });
 }
 main().catch((err) => {
   logger.error(`fatal: ${String(err)}`);
