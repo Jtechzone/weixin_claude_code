@@ -24787,6 +24787,21 @@ function getExtensionFromMime(mimeType) {
   const ct = mimeType.split(";")[0].trim().toLowerCase();
   return MIME_TO_EXTENSION[ct] ?? ".bin";
 }
+function getExtensionFromBuffer(buf, defaultExt = ".jpg") {
+  if (buf.length < 4)
+    return defaultExt;
+  if (buf[0] === 255 && buf[1] === 216 && buf[2] === 255)
+    return ".jpg";
+  if (buf[0] === 137 && buf[1] === 80 && buf[2] === 78 && buf[3] === 71)
+    return ".png";
+  if (buf[0] === 71 && buf[1] === 73 && buf[2] === 70 && buf[3] === 56)
+    return ".gif";
+  if (buf[0] === 66 && buf[1] === 77)
+    return ".bmp";
+  if (buf.length >= 12 && buf[0] === 82 && buf[1] === 73 && buf[2] === 70 && buf[3] === 70 && buf[8] === 87 && buf[9] === 69 && buf[10] === 66 && buf[11] === 80)
+    return ".webp";
+  return defaultExt;
+}
 
 // src/cdn/upload.ts
 import crypto3 from "crypto";
@@ -25802,11 +25817,11 @@ async function silkToWav(silkBuf) {
 // src/media/media-download.ts
 var WEIXIN_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
 var INBOUND_MEDIA_DIR = path6.join(os3.tmpdir(), "weixin-claude-code", "media", "inbound");
-async function saveTempMedia(buf, contentType, originalFilename) {
+async function saveTempMedia(buf, contentType, originalFilename, explicitExt) {
   if (buf.length > WEIXIN_MEDIA_MAX_BYTES)
     throw new Error(`media too large: ${buf.length} bytes (max ${WEIXIN_MEDIA_MAX_BYTES})`);
   await fs5.mkdir(INBOUND_MEDIA_DIR, { recursive: true });
-  const ext = originalFilename ? path6.extname(originalFilename) : contentType ? getExtensionFromMime(contentType) : ".bin";
+  const ext = explicitExt ?? (originalFilename ? path6.extname(originalFilename) : contentType ? getExtensionFromMime(contentType) : ".bin");
   const name = tempFileName("wx-inbound", ext);
   const filePath = path6.join(INBOUND_MEDIA_DIR, name);
   await fs5.writeFile(filePath, buf);
@@ -25823,7 +25838,8 @@ async function downloadMediaFromItem(item, deps) {
     logger.debug(`${label} image: encrypt_query_param=${img.media.encrypt_query_param.slice(0, 40)}... hasAesKey=${Boolean(aesKeyBase64)} aeskeySource=${img.aeskey ? "image_item.aeskey" : "media.aes_key"}`);
     try {
       const buf = aesKeyBase64 ? await downloadAndDecryptBuffer(img.media.encrypt_query_param, aesKeyBase64, cdnBaseUrl, `${label} image`) : await downloadPlainCdnBuffer(img.media.encrypt_query_param, cdnBaseUrl, `${label} image-plain`);
-      const saved = await saveTempMedia(buf, undefined);
+      const ext = getExtensionFromBuffer(buf);
+      const saved = await saveTempMedia(buf, undefined, undefined, ext);
       result.decryptedPicPath = saved.path;
       logger.debug(`${label} image saved: ${saved.path}`);
     } catch (err) {

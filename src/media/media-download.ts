@@ -5,7 +5,7 @@ import type { MessageItem } from "../api/types.js";
 import { MessageItemType } from "../api/types.js";
 import { downloadAndDecryptBuffer, downloadPlainCdnBuffer } from "../cdn/pic-decrypt.js";
 import { silkToWav } from "./silk-transcode.js";
-import { getMimeFromFilename, getExtensionFromMime } from "./mime.js";
+import { getMimeFromFilename, getExtensionFromMime, getExtensionFromBuffer } from "./mime.js";
 import { logger } from "../util/logger.js";
 import { tempFileName } from "../util/random.js";
 
@@ -21,10 +21,10 @@ export type InboundMediaResult = {
   decryptedVideoPath?: string;
 };
 
-async function saveTempMedia(buf: Buffer, contentType: string | undefined, originalFilename?: string): Promise<{ path: string }> {
+async function saveTempMedia(buf: Buffer, contentType: string | undefined, originalFilename?: string, explicitExt?: string): Promise<{ path: string }> {
   if (buf.length > WEIXIN_MEDIA_MAX_BYTES) throw new Error(`media too large: ${buf.length} bytes (max ${WEIXIN_MEDIA_MAX_BYTES})`);
   await fs.mkdir(INBOUND_MEDIA_DIR, { recursive: true });
-  const ext = originalFilename ? path.extname(originalFilename) : contentType ? getExtensionFromMime(contentType) : ".bin";
+  const ext = explicitExt ?? (originalFilename ? path.extname(originalFilename) : contentType ? getExtensionFromMime(contentType) : ".bin");
   const name = tempFileName("wx-inbound", ext);
   const filePath = path.join(INBOUND_MEDIA_DIR, name);
   await fs.writeFile(filePath, buf);
@@ -69,7 +69,8 @@ export async function downloadMediaFromItem(
             cdnBaseUrl,
             `${label} image-plain`,
           );
-      const saved = await saveTempMedia(buf, undefined);
+      const ext = getExtensionFromBuffer(buf);
+      const saved = await saveTempMedia(buf, undefined, undefined, ext);
       result.decryptedPicPath = saved.path;
       logger.debug(`${label} image saved: ${saved.path}`);
     } catch (err) {
